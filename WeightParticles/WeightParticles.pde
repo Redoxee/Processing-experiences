@@ -1,11 +1,17 @@
 // Written by Anton Roy (AntonMakesGames)
+import processing.svg.*;
 
 GravityBody[] gravityBodies;
 Body[] bodies;
-int nbBodies = 100;
-float sceneSize = 2000;
+int nbBodies = 10;
+final float inkscapeFactor = 3.779528;
+
+final float sceneSize = 792;
+ArrayList<Vec2>[] trajectories;
 Parameters savedParam, currentParam;
 float drag = 1;
+
+boolean isRecording = false;
 
 Vec2 centerOfMass;
 
@@ -21,6 +27,7 @@ void ApplyParam(Parameters param)
     float fndex = (float)index;
     float rv = 1;//random(0,1);
     bodies[index] = new Body(param.StartPos.x + ax * fndex, param.StartPos.y + ay * fndex, dx * rv, dy * rv);
+    trajectories[index] = new ArrayList<Vec2>();
   }
   
   background(250);
@@ -29,11 +36,11 @@ void ApplyParam(Parameters param)
 }
 
 void setup() {
-  size(1000, 1000);
-  float s = 1000;
+  size(548, 377);
   gravityBodies = new GravityBody[1];
-  gravityBodies[0] = new GravityBody(s/2, s/2, 2000);
+  gravityBodies[0] = new GravityBody(width/2f, height/2f, 2000);
   bodies = new Body[nbBodies];
+  trajectories = new ArrayList[nbBodies];
   Parameters param = new Parameters();
   param.Randomize();
   savedParam = param;
@@ -45,16 +52,41 @@ float time = 0;
 
 void draw()
 {
+  stroke(0);
+  if(isRecording)
+  {
+    for(int index = 0; index < nbBodies;++index)
+    {
+      int nbPoints = trajectories[index].size();
+      Vec2 p1 = trajectories[index].get(0);
+      for(int i = 1; i < nbPoints; ++i)
+      {
+        Vec2 p2 = trajectories[index].get(i);
+        if(p1.InsideScreen() && p2.InsideScreen())
+        {
+          line(p1.x, p1.y, p2.x, p2.y);
+        }
+        p1 = p2;
+      }
+    }
+    
+    endRecord();
+    println("Stop recording");
+    isRecording = false;
+    
+    return;
+  }
+  
   float dt = .1;
   time += dt;
   centerOfMass = new Vec2(0, 0);
   
-  stroke(0);
   for(int index = 0; index < nbBodies; ++index)
   {
     Body body = bodies[index];
     body.Update(dt, gravityBodies);
-    line(body.px,body.py,body.x,body.y); 
+    line(body.px,body.py,body.x,body.y);
+    trajectories[index].add(new Vec2(body.px,body.py));
     centerOfMass.x += body.x;
     centerOfMass.y += body.y;
   }
@@ -68,7 +100,6 @@ void draw()
   stroke(0,0,255);
   centerOfMass.x /= nbBodies;
   centerOfMass.y /= nbBodies;
-  //circle(centerOfMass.x, centerOfMass.y, 4);
 }
 
 void keyPressed()
@@ -97,6 +128,14 @@ void keyPressed()
     println("load current param");
     currentParam = new Parameters(savedParam);
     ApplyParam(currentParam);
+  }
+  
+  if(key == 'o' && !isRecording)
+  {
+    println("Start recording");
+    
+    beginRecord(SVG, "GravityRecording.svg");
+    isRecording = true;
   }
 }
 
@@ -162,6 +201,11 @@ class Vec2
   {
     this.x = o.x;
     this.y = o.y;
+  }
+  
+  boolean InsideScreen()
+  {
+    return this.x >=0 && this.y >= 0 && this.x <= width && this.y <= height;
   }
 }
 
