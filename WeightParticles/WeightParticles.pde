@@ -3,13 +3,13 @@ import processing.svg.*;
 
 GravityBody[] gravityBodies;
 Body[] bodies;
-int nbBodies = 10;
+int nbBodies = 50;
 final float inkscapeFactor = 3.779528;
 
 final float sceneSize = 792;
 ArrayList<Vec2>[] trajectories;
 Parameters savedParam, currentParam;
-float drag = 1;
+float drag = .99;
 
 boolean isRecording = false;
 
@@ -53,6 +53,7 @@ float time = 0;
 void draw()
 {
   stroke(0);
+  circleCorner();
   if(isRecording)
   {
     for(int index = 0; index < nbBodies;++index)
@@ -100,6 +101,14 @@ void draw()
   stroke(0,0,255);
   centerOfMass.x /= nbBodies;
   centerOfMass.y /= nbBodies;
+}
+
+void circleCorner()
+{
+  circle(1, 1, 2);
+  circle(width - 1, 1, 2);
+  circle(width - 1, height - 1, 2);
+  circle(1, height - 1, 2);
 }
 
 void keyPressed()
