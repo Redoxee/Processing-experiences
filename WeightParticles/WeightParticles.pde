@@ -171,11 +171,44 @@ void keyPressed()
   
   if(key == 'o' && !isRecording)
   {
-    println("Start recording");
+    String fileName = GetAvailableFileName("GravityRecording", "svg");
+    println("Start recording " + fileName);
     
-    beginRecord(SVG, "GravityRecording.svg");
+    beginRecord(SVG, fileName);
     isRecording = true;
   }
+}
+
+String GetAvailableFileName(String desiredFileName, String extension)
+{
+  String ext = "." + extension;
+  if(!DoFileExist(desiredFileName + ext))
+  {
+    return desiredFileName + ext;
+  }
+
+  int counter = 1;
+  while(counter < 100)
+  {
+    String name = desiredFileName + "_" + nf(counter,2);
+    counter++;
+    if(!DoFileExist(name + ext))
+    {
+      return name + ext;
+    }
+  }
+
+  return "";
+}
+
+boolean DoFileExist(String fileName)
+{
+  fileName = sketchPath() + "\\" + fileName;
+  File f = new File(fileName);
+  String filePath = f.getPath();
+  boolean exist = f.isFile();
+  println(filePath, exist);
+  return f.isFile();
 }
 
 class GravityBody
