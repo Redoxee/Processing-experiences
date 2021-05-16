@@ -3,15 +3,19 @@ import processing.svg.*;
 
 GravityBody[] gravityBodies;
 Body[] bodies;
-int nbBodies = 50;
+int nbBodies = 200;
 final float inkscapeFactor = 3.779528;
 
 final float sceneSize = 792;
 ArrayList<Vec2>[] trajectories;
 Parameters savedParam, currentParam;
 float drag = .99;
-float noiseRange = 1;
+float noiseRange = .6;
 float noiseZoom = .003;
+Vec2 baseVelocityRange = new Vec2(0, 50);
+float mainMass = 2000;
+
+Vec2 initialSpread = new Vec2(0, 500);
 
 boolean isRecording = false;
 
@@ -19,11 +23,20 @@ Vec2 centerOfMass;
 
 void ApplyParam(Parameters param)
 {
+  spawnBodiesInCircle(param);
+  
+  background(250);
+  circle(param.StartPos.x, param.StartPos.y, 5);
+  println("("+param.StartPos.x+","+param.StartPos.y+")");
+}
+
+void spawnBodiesInLine(Parameters param)
+{
   float ax = (sin(param.Angle) * param.Len) / nbBodies;
   float ay = (cos(param.Angle) * param.Len) / nbBodies;
-  
   float dx = param.BaseVelocity.x;
   float dy = param.BaseVelocity.x;
+
   for(int index = 0; index < nbBodies; ++index)
   {
     float fndex = (float)index;
@@ -31,16 +44,31 @@ void ApplyParam(Parameters param)
     bodies[index] = new Body(param.StartPos.x + ax * fndex, param.StartPos.y + ay * fndex, dx * rv, dy * rv);
     trajectories[index] = new ArrayList<Vec2>();
   }
+}
+
+void spawnBodiesInCircle(Parameters param)
+{
+  float cx = width / 2;
+  float cy = height / 2;
+  float radius = param.Len;
   
-  background(250);
-  circle(param.StartPos.x, param.StartPos.y, 5);
-  println("("+param.StartPos.x+","+param.StartPos.y+")");
+  float len2 = param.BaseVelocity.x * param.BaseVelocity.x + param.BaseVelocity.y * param.BaseVelocity.y;
+  float len = sqrt(len2);
+
+  for(int index = 0; index < nbBodies; ++index)
+  {
+    float f = (float)index / (float)nbBodies * 6.28318;
+    float ax = cos(f);
+    float ay = sin(f);
+    bodies[index] = new Body(cx + ax * radius, cy + ay * radius, ay * len, -ax * len);
+    trajectories[index] = new ArrayList<Vec2>();
+  }
 }
 
 void setup() {
   size(548, 377);
   gravityBodies = new GravityBody[1];
-  gravityBodies[0] = new GravityBody(width/2f, height/2f, 2000);
+  gravityBodies[0] = new GravityBody(width/2f, height/2f, mainMass);
   bodies = new Body[nbBodies];
   trajectories = new ArrayList[nbBodies];
   Parameters param = new Parameters();
@@ -194,11 +222,17 @@ class Body
       accY += (diry / len) * (body.w / len);
     }
     
-    this.dx += (noise(this.x * noiseZoom, this.y * noiseZoom, 0) * noiseRange * 2) - noiseRange;
-    this.dy += (noise(this.x * noiseZoom, this.y * noiseZoom, 1) * noiseRange * 2) - noiseRange;
-    
-    this.dx = (this.dx + accX * dt) * drag;
-    this.dy = (this.dy + accY * dt) * drag;
+    if(noiseRange != 0)
+    {
+      this.dx += (noise(this.x * noiseZoom, this.y * noiseZoom, 0) * noiseRange * 2) - noiseRange;
+      this.dy += (noise(this.x * noiseZoom, this.y * noiseZoom, 1) * noiseRange * 2) - noiseRange;
+    }
+
+    if(drag != 1)
+    {
+      this.dx = (this.dx + accX * dt) * drag;
+      this.dy = (this.dy + accY * dt) * drag;
+    }
   }
 }
 
@@ -268,15 +302,16 @@ class Parameters
   
   void RandomizeLength()
   {
-    float ll = random(1, 500);
+    float ll = random(initialSpread.x, initialSpread.y);
     this.Len = ll;
   }
   
   void RandomizeBaseVelocity()
   {
-    float velocityRange = 50;
-    float dx = random(-velocityRange,velocityRange);
-    float dy = random(-velocityRange, velocityRange);
+    float randomAngle = random(6.28318);
+    float randomVelocityLength = random(baseVelocityRange.x, baseVelocityRange.y);
+    float dx = cos(randomAngle) * randomVelocityLength;
+    float dy = sin(randomAngle) * randomVelocityLength;
     this.BaseVelocity = new Vec2(dx, dy);
   }
   
