@@ -10,6 +10,8 @@ final float sceneSize = 792;
 ArrayList<Vec2>[] trajectories;
 Parameters savedParam, currentParam;
 float drag = .99;
+float noiseRange = 1;
+float noiseZoom = .003;
 
 boolean isRecording = false;
 
@@ -191,6 +193,9 @@ class Body
       accX += (dirx / len) * (body.w / len);
       accY += (diry / len) * (body.w / len);
     }
+    
+    this.dx += (noise(this.x * noiseZoom, this.y * noiseZoom, 0) * noiseRange * 2) - noiseRange;
+    this.dy += (noise(this.x * noiseZoom, this.y * noiseZoom, 1) * noiseRange * 2) - noiseRange;
     
     this.dx = (this.dx + accX * dt) * drag;
     this.dy = (this.dy + accY * dt) * drag;
