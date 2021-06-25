@@ -3,31 +3,37 @@ import processing.svg.*;
 
 GravityBody[] gravityBodies;
 Body[] bodies;
-int nbBodies = 200;
+int nbBodies = 300;
 final float inkscapeFactor = 3.779528;
 
 final float sceneSize = 792;
 ArrayList<Vec2>[] trajectories;
 Parameters savedParam, currentParam;
-float drag = .99;
-float noiseRange = .6;
-float noiseZoom = .003;
-Vec2 baseVelocityRange = new Vec2(0, 50);
-float mainMass = 2000;
-
-Vec2 initialSpread = new Vec2(0, 500);
+float drag = .998;
+float noiseRange = .07;
+float noiseZoom = .01;
+Vec2 baseVelocityRange = new Vec2(-2, 4);
+float mainMass = -5;
+float mainRadius = 0;
+boolean applyDeath = false;
+Vec2 initialSpread = new Vec2(0, 20);
 
 boolean isRecording = false;
 
 Vec2 centerOfMass;
 
+enum States
+{UpdatingBodies, PreparingPainting}
+States state;
+
 void ApplyParam(Parameters param)
 {
+//  spawnBodiesInLine(param);
   spawnBodiesInCircle(param);
   
-  background(250);
-  circle(param.StartPos.x, param.StartPos.y, 5);
+  background(255);
   println("("+param.StartPos.x+","+param.StartPos.y+")");
+  state = States.UpdatingBodies;
 }
 
 void spawnBodiesInLine(Parameters param)
@@ -68,7 +74,7 @@ void spawnBodiesInCircle(Parameters param)
 void setup() {
   size(548, 377);
   gravityBodies = new GravityBody[1];
-  gravityBodies[0] = new GravityBody(width/2f, height/2f, mainMass);
+  gravityBodies[0] = new GravityBody(width/2f, height/2f, mainMass, mainRadius);
   bodies = new Body[nbBodies];
   trajectories = new ArrayList[nbBodies];
   Parameters param = new Parameters();
@@ -83,9 +89,43 @@ float time = 0;
 void draw()
 {
   stroke(0);
-  circleCorner();
-  if(isRecording)
+  if(state == States.UpdatingBodies)
   {
+    float dt = .1;
+    time += dt;
+    
+    for(int index = 0; index < nbBodies; ++index)
+    {
+      Body body = bodies[index];
+      if(body.dead)
+      {
+        continue;
+      }
+      
+      body.Update(dt, gravityBodies);
+      line(body.px,body.py,body.x,body.y);
+      trajectories[index].add(new Vec2(body.px,body.py));
+    }
+    
+    stroke(255,0,0);
+    for(int index = 0; index < gravityBodies.length; ++index)
+    {
+      circle(gravityBodies[index].x,gravityBodies[index].y, 3);
+    }
+  }
+  else if(state == States.PreparingPainting)
+  {
+    background(225);
+    
+    if(isRecording)
+    {
+      String fileName = GetAvailableFileName("GravityRecording", "svg");
+      println("Start recording " + fileName);
+      beginRecord(SVG, fileName);
+    }
+    
+    circleCorner();
+    
     for(int index = 0; index < nbBodies;++index)
     {
       int nbPoints = trajectories[index].size();
@@ -101,36 +141,13 @@ void draw()
       }
     }
     
-    endRecord();
-    println("Stop recording");
-    isRecording = false;
-    
-    return;
+    if(isRecording)
+    { 
+      endRecord();
+      println("Stop recording");
+      isRecording = false;
+    }
   }
-  
-  float dt = .1;
-  time += dt;
-  centerOfMass = new Vec2(0, 0);
-  
-  for(int index = 0; index < nbBodies; ++index)
-  {
-    Body body = bodies[index];
-    body.Update(dt, gravityBodies);
-    line(body.px,body.py,body.x,body.y);
-    trajectories[index].add(new Vec2(body.px,body.py));
-    centerOfMass.x += body.x;
-    centerOfMass.y += body.y;
-  }
-  
-  stroke(255,0,0);
-  for(int index = 0; index < gravityBodies.length; ++index)
-  {
-    circle(gravityBodies[index].x,gravityBodies[index].y, 3);
-  }
-  
-  stroke(0,0,255);
-  centerOfMass.x /= nbBodies;
-  centerOfMass.y /= nbBodies;
 }
 
 void circleCorner()
@@ -169,14 +186,45 @@ void keyPressed()
     ApplyParam(currentParam);
   }
   
-  if(key == 'o' && !isRecording)
+  if(key == 'p')
   {
-    String fileName = GetAvailableFileName("GravityRecording", "svg");
-    println("Start recording " + fileName);
-    
-    beginRecord(SVG, fileName);
-    isRecording = true;
+    if(state == States.UpdatingBodies)
+    {
+      state = States.PreparingPainting;
+    }
+    else if(state == States.PreparingPainting)
+    {
+      state = States.UpdatingBodies;
+    }
   }
+  
+  if(state == States.PreparingPainting)
+  {
+    if(key == 'o' && !isRecording)
+    {
+      isRecording = true;
+    }
+    
+    if(key == 'j')
+    {
+      this.SimplifyLines();
+    }
+  }
+}
+
+void SimplifyLines()
+{
+  
+  for(int index = 0; index < nbBodies;++index)
+    {
+      int nbPoints = trajectories[index].size();
+      
+      int halfPoints = nbPoints / 2;
+      for(int i = 0; i < halfPoints; ++i)
+      {
+        trajectories[index].remove(nbPoints - 1 - i * 2);
+      }
+    }
 }
 
 String GetAvailableFileName(String desiredFileName, String extension)
@@ -213,18 +261,20 @@ boolean DoFileExist(String fileName)
 
 class GravityBody
 {
-  float x,y,w;
-  GravityBody(float x,float y,float w)
+  float x,y,w,r;
+  GravityBody(float x,float y,float w, float r)
   {
     this.x = x;
     this.y = y;
     this.w = w;
+    this.r = r;
   }
 }
 
 class Body
 {
   float x,y,dx,dy,px,py;
+  boolean dead = false;
   Body(float x,float y,float dx,float dy)
   {
     this.x = x;
@@ -233,10 +283,16 @@ class Body
     this.dy = dy;
     this.px = x;
     this.py = y;
+    this.dead = false;
   }
   
   void Update(float dt, GravityBody[] gBodies)
   {
+    if(this.dead)
+    {
+      return;
+    }
+    
     this.px = this.x;
     this.py = this.y;
     this.x += this.dx * dt;
@@ -244,6 +300,7 @@ class Body
     
     int nbG = gBodies.length;
     float accX = 0, accY = 0;
+    boolean touch = false;
     for(int index = 0; index < nbG; ++index)
     {
       GravityBody body = gBodies[index];
@@ -253,18 +310,28 @@ class Body
       float len = sqrt(len2);
       accX += (dirx / len) * (body.w / len);
       accY += (diry / len) * (body.w / len);
+      
+      if(len < body.r)
+      {
+        touch = true;
+      }
     }
     
     if(noiseRange != 0)
     {
-      this.dx += (noise(this.x * noiseZoom, this.y * noiseZoom, 0) * noiseRange * 2) - noiseRange;
-      this.dy += (noise(this.x * noiseZoom, this.y * noiseZoom, 1) * noiseRange * 2) - noiseRange;
+      this.dx += (noise(this.x * noiseZoom, this.y * noiseZoom, -time * .01) * noiseRange * 2) - noiseRange;
+      this.dy += (noise(this.x * noiseZoom, this.y * noiseZoom, time * .01) * noiseRange * 2) - noiseRange;
     }
 
     if(drag != 1)
     {
       this.dx = (this.dx + accX * dt) * drag;
       this.dy = (this.dy + accY * dt) * drag;
+    }
+    
+    if(touch && applyDeath)
+    {
+      this.dead = true;
     }
   }
 }
