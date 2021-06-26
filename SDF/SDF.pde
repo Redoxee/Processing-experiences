@@ -1,7 +1,7 @@
 // Written by Anton Roy (AntonMakesGames)
 import processing.svg.*;
 
-String recordingName = "GravityRecording";
+String exportFileName = "sdfRecording";
 
 GravityBody[] gravityBodies;
 Body[] bodies;
@@ -30,12 +30,17 @@ float fieldFactor = -40.;
 PImage sdf;
 Vec4[] vecSdf;
 
+enum States
+{UpdatingBodies, PreparingPainting}
+States state;
+
 void ApplyParam(Parameters param)
 {
   //spawnBodiesInCircle(param);
   spawnBodiesInSideLine(param);
   //spawnBodiesInLine(param);
-
+  
+  state = States.UpdatingBodies;
   background(250);
 }
 
@@ -171,10 +176,43 @@ void buildVecSdf()
 void draw()
 {
   stroke(0);
-  circleCorner();
-  
-  if(isRecording)
+  if(state == States.UpdatingBodies)
   {
+    float dt = .1;
+    time += dt;
+    
+    for(int index = 0; index < nbBodies; ++index)
+    {
+      Body body = bodies[index];
+      if(body.dead)
+      {
+        continue;
+      }
+      
+      body.Update(dt, gravityBodies);
+      line(body.px,body.py,body.x,body.y);
+      trajectories[index].add(new Vec2(body.px,body.py));
+    }
+    
+    stroke(255,0,0);
+    for(int index = 0; index < gravityBodies.length; ++index)
+    {
+      circle(gravityBodies[index].x,gravityBodies[index].y, 3);
+    }
+  }
+  else if(state == States.PreparingPainting)
+  {
+    background(225);
+    
+    if(isRecording)
+    {
+      String fileName = GetAvailableFileName(exportFileName, "svg");
+      println("Start recording " + fileName);
+      beginRecord(SVG, fileName);
+    }
+    
+    circleCorner();
+    
     for(int index = 0; index < nbBodies;++index)
     {
       int nbPoints = trajectories[index].size();
@@ -186,33 +224,16 @@ void draw()
         {
           line(p1.x, p1.y, p2.x, p2.y);
         }
-
-        circle(p2.x,p2.y, 10);
-
         p1 = p2;
       }
     }
     
-    endRecord();
-    println("Stop recording");
-    isRecording = false;
-    
-    return;
-  }
-  
-  float dt = .1;
-  time += dt;
-  centerOfMass = new Vec2(0, 0);
-  
-  for(int index = 0; index < nbBodies; ++index)
-  {
-    Body body = bodies[index];
-    body.Update(dt, gravityBodies);
-    
-    line(body.px,body.py,body.x,body.y);
-    trajectories[index].add(new Vec2(body.px,body.py));
-    centerOfMass.x += body.x;
-    centerOfMass.y += body.y;
+    if(isRecording)
+    { 
+      endRecord();
+      println("Stop recording");
+      isRecording = false;
+    }
   }
 }
 
@@ -252,14 +273,45 @@ void keyPressed()
     ApplyParam(currentParam);
   }
   
-  if(key == 'o' && !isRecording)
+  if(key == 'p')
   {
-    String fileName = GetAvailableFileName(recordingName, "svg");
-    println("Start recording " + fileName);
-    
-    beginRecord(SVG, fileName);
-    isRecording = true;
+    if(state == States.UpdatingBodies)
+    {
+      state = States.PreparingPainting;
+    }
+    else if(state == States.PreparingPainting)
+    {
+      state = States.UpdatingBodies;
+    }
   }
+  
+  if(state == States.PreparingPainting)
+  {
+    if(key == 'o' && !isRecording)
+    {
+      isRecording = true;
+    }
+    
+    if(key == 'j')
+    {
+      this.SimplifyLines();
+    }
+  }
+}
+
+void SimplifyLines()
+{
+  
+  for(int index = 0; index < nbBodies;++index)
+    {
+      int nbPoints = trajectories[index].size();
+      
+      int halfPoints = nbPoints / 2;
+      for(int i = 0; i < halfPoints; ++i)
+      {
+        trajectories[index].remove(nbPoints - 1 - i * 2);
+      }
+    }
 }
 
 String GetAvailableFileName(String desiredFileName, String extension)
@@ -317,6 +369,7 @@ class Body
   float x,y,px,py;
   Vec2 speed;
   boolean isInZone;
+  boolean dead;
   Body(float x,float y,float dx,float dy)
   {
     this.x = x;
@@ -325,6 +378,7 @@ class Body
     this.px = x;
     this.py = y;
     this.isInZone = false;
+    this.dead = false;
   }
   
   void Update(float dt, GravityBody[] gBodies)
