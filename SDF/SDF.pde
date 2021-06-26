@@ -1,23 +1,23 @@
 // Written by Anton Roy (AntonMakesGames)
 import processing.svg.*;
 
-String exportFileName = "sdfRecording";
+String exportFileName = "Exports/sdfRecording";
 
 GravityBody[] gravityBodies;
 Body[] bodies;
-int nbBodies = 200;
+int nbBodies = 150;
 final float inkscapeFactor = 3.779528;
 
 final float sceneSize = 792;
 ArrayList<Vec2>[] trajectories;
 Parameters savedParam, currentParam;
 float drag = 1.;
-float noiseRange = 0;
-float noiseZoom = .003;
-Vec2 baseVelocityRange = new Vec2(1, 10);
+float noiseRange = .5;
+float noiseZoom = .15;
+Vec2 baseVelocityRange = new Vec2(1, 30);
 float mainMass = 2000;
 
-Vec2 initialSpread = new Vec2(0, 400);
+Vec2 initialSpread = new Vec2(10, 30);
 
 float sdfPerturbation = .3;
 
@@ -25,7 +25,7 @@ boolean isRecording = false;
 
 Vec2 centerOfMass;
 
-String fieldName = "MoreCircles.jpg";
+String fieldName = "Circle.jpg";
 float fieldFactor = -40.;
 PImage sdf;
 Vec4[] vecSdf;
@@ -36,8 +36,8 @@ States state;
 
 void ApplyParam(Parameters param)
 {
-  //spawnBodiesInCircle(param);
-  spawnBodiesInSideLine(param);
+  spawnBodiesInCircle(param);
+  //spawnBodiesInSideLine(param);
   //spawnBodiesInLine(param);
   
   state = States.UpdatingBodies;
@@ -68,6 +68,14 @@ void spawnBodiesInCircle(Parameters param)
   
   float len2 = param.BaseVelocity.x * param.BaseVelocity.x + param.BaseVelocity.y * param.BaseVelocity.y;
   float len = sqrt(len2);
+  boolean outward = true;
+  float speedFactor = 1;
+  if(outward)
+  {
+    speedFactor = -1;
+  }
+
+  speedFactor *= len / radius;
 
   for(int index = 0; index < nbBodies; ++index)
   {
@@ -76,7 +84,7 @@ void spawnBodiesInCircle(Parameters param)
     float ay = sin(f);
     float px = cx + ax * radius;
     float py = cy + ay * radius;
-    bodies[index] = new Body(px, py, (cx - px) * len / radius, (cy - py) * len / radius);
+    bodies[index] = new Body(px, py, (cx - px) * speedFactor, (cy - py) * speedFactor);
     trajectories[index] = new ArrayList<Vec2>();
   }
 }
@@ -104,11 +112,11 @@ void spawnBodiesAcrossScreen(Parameters param)
 void spawnBodiesInSideLine(Parameters param)
 {
   float halfWidth = (float)width/2.0;
-  float shrnk = .8;
+  float shrnk = .85;
 
   int halfBodies = nbBodies / 2;
 
-  boolean mirror = false;
+  boolean mirror = true;
   int loopcount = mirror ? halfBodies : nbBodies;
 
   for(int index = 0; index < loopcount; ++index)
@@ -314,6 +322,27 @@ void SimplifyLines()
     }
 }
 
+/*
+void SimplifyAlignment()
+{
+  for(int index = 0; index < nbBodies;++index)
+    {
+      int nbPoints = trajectories[index].size();
+      for(int i = nbPoints - 1; i > 0 ; --i)
+      {
+        Vec2 C = trajectories[index].get(i);
+        Vec2 A = trajectories[index].get(i + 1);
+        Vec2 B = trajectories[index].get(i - 1);
+        Vec2 CA = new Vec2(A.x - C.x, A.y - C.y);
+        Vec2 CB = new Vec2(B.x - C.x, B.y - C.y);
+        float dot = CA.Dot(CB);
+        if(abs(dot < .
+        
+        trajectories[index].remove(nbPoints - 1 - i * 2);
+      }
+    }
+}
+*/
 String GetAvailableFileName(String desiredFileName, String extension)
 {
   String ext = "." + extension;
@@ -368,6 +397,7 @@ class Body
 {
   float x,y,px,py;
   Vec2 speed;
+  Vec2 recordedSpeed;
   boolean isInZone;
   boolean dead;
   Body(float x,float y,float dx,float dy)
@@ -393,17 +423,23 @@ class Body
     boolean inZone = sdf.y > 0;
     //this.dx = sdf.z * fieldFactor;
     //this.dy = sdf.w * fieldFactor;
-
+    
+    float n = (noise(this.x * noiseZoom, this.y * noiseZoom, -time * .01) * noiseRange * 2) - noiseRange;
     if(inZone != this.isInZone)
     {
       if(inZone)
       {
-        this.speed = this.speed.Rotate(sdfPerturbation);
+        this.recordedSpeed = this.speed;
       }
       else
       {
-        this.speed = this.speed.Rotate(-sdfPerturbation);
+        this.speed = this.recordedSpeed;
       }
+    }
+
+    if(inZone)
+    {
+       this.speed = this.speed.Rotate(n);
     }
 
     this.x += this.speed.x * dt;
@@ -413,8 +449,8 @@ class Body
 
     if(noiseRange != 0)
     {
-      this.speed.x += (noise(this.x * noiseZoom, this.y * noiseZoom, 0) * noiseRange * 2) - noiseRange;
-      this.speed.y += (noise(this.x * noiseZoom, this.y * noiseZoom, 1) * noiseRange * 2) - noiseRange;
+//      this.speed.x += (noise(this.x * noiseZoom, this.y * noiseZoom, 0) * noiseRange * 2) - noiseRange;
+ //     this.speed.y += (noise(this.x * noiseZoom, this.y * noiseZoom, 1) * noiseRange * 2) - noiseRange;
     }
 
     if(drag != 1)
@@ -450,6 +486,11 @@ class Vec2
     float ca = cos(a);
     float sa = sin(a);
     return new Vec2(ca * this.x - sa * this.y, sa * this.x + ca * this.y);
+  }
+  
+  float Dot(Vec2 other)
+  {
+    return this.x * other.x + this.y * other.y;
   }
 }
 
