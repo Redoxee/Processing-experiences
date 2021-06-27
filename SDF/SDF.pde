@@ -5,7 +5,7 @@ String exportFileName = "Exports/sdfRecording";
 
 GravityBody[] gravityBodies;
 Body[] bodies;
-int nbBodies = 150;
+int nbBodies = 300;
 final float inkscapeFactor = 3.779528;
 
 final float sceneSize = 792;
@@ -17,7 +17,7 @@ float noiseZoom = .15;
 Vec2 baseVelocityRange = new Vec2(1, 30);
 float mainMass = 2000;
 
-Vec2 initialSpread = new Vec2(10, 30);
+Vec2 initialSpread = new Vec2(200, 300);
 
 float sdfPerturbation = .3;
 
@@ -68,7 +68,7 @@ void spawnBodiesInCircle(Parameters param)
   
   float len2 = param.BaseVelocity.x * param.BaseVelocity.x + param.BaseVelocity.y * param.BaseVelocity.y;
   float len = sqrt(len2);
-  boolean outward = true;
+  boolean outward = false;
   float speedFactor = 1;
   if(outward)
   {
@@ -172,7 +172,7 @@ void buildVecSdf()
       int b = argb & 0xFF;          // Faster way of getting blue(argb)
 
       float fa = (float)a / 128f - 1f;
-      float fr = (float)r / 128f - 1f;
+      float fr = (float)r / 256f;
       float fg = (float)g / 128f - 1f;
       float fb = (float)b / 128f - 1f;
       int screenIndex = y * width + x;
@@ -421,10 +421,11 @@ class Body
 
     Vec4 sdf = vecSdf[sdfIndex];
     boolean inZone = sdf.y > 0;
+    float zoneForce = sdf.y;
     //this.dx = sdf.z * fieldFactor;
     //this.dy = sdf.w * fieldFactor;
     
-    float n = (noise(this.x * noiseZoom, this.y * noiseZoom, -time * .01) * noiseRange * 2) - noiseRange;
+    float n = (noise(this.x * noiseZoom, this.y * noiseZoom, .01) * noiseRange * 2) - noiseRange;
     if(inZone != this.isInZone)
     {
       if(inZone)
@@ -437,9 +438,9 @@ class Body
       }
     }
 
+    this.speed = this.speed.Rotate(n * zoneForce);
     if(inZone)
     {
-       this.speed = this.speed.Rotate(n);
     }
 
     this.x += this.speed.x * dt;
