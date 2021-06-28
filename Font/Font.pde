@@ -1,4 +1,6 @@
 
+import processing.svg.*;
+
 FontObject loadedFont;
 
 void setup()
@@ -8,9 +10,36 @@ void setup()
   background(225);
 }
 
+boolean isRecording = false;
+
+void draw()
+{
+  if(isRecording)
+  {
+      beginRecord(SVG, "TestRecord.svg");
+  }
+  
+  stroke(0);
+  loadedFont.Draw("#Hello World#", new PVector(100,100) , 30);
+  loadedFont.Draw("Anton Yay", new PVector(150,300) , 10);
+
+  if(isRecording)
+  {
+    endRecord();
+    isRecording = false;
+  }
+}
+void keyPressed()
+{
+  if(key == 'r')
+  {
+    isRecording = true;
+  }
+}
+
 FontObject loadFontXML(String fileName)
 {
-  String acceptedCharacters = "abcdefghijklmnopqrstuvwxzABCDEFGHIJKLMNOPQRSTUVWXZ0123456789 ?.-";
+  String acceptedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ?.-#";
   
   FontObject result = new FontObject();
   result.Glyphs = new HashMap<String, Glyph>();
@@ -23,7 +52,7 @@ FontObject loadFontXML(String fileName)
   
   for(int index = 0; index < glyphs.length; ++index)
   {
-    String unicode = trim(glyphs[index].getString("unicode"));
+    String unicode = glyphs[index].getString("unicode");
     if(acceptedCharacters.indexOf(unicode) < 0)
     {
       continue;
@@ -66,14 +95,6 @@ FontObject loadFontXML(String fileName)
   return result;
 }
 
-void draw()
-{
-  pushMatrix();
-  stroke(0);
-  loadedFont.Draw("Hello World", new PVector(0,100) , 30);
-  popMatrix();
-}
-
 class FontObject
 {
   HashMap<String, Glyph> Glyphs;
@@ -109,12 +130,13 @@ class Glyph
     for(int index = 0; index < this.Nodes.length; ++index)
     {
       GlyphNode node = this.Nodes[index];
+      PVector newPosition = new PVector(position.x + node.Position.x * scale, position.y + node.Position.y * scale);
       if(!node.IsMove)
       {
-        line(currentPosition.x * scale, currentPosition.y * scale, node.Position.x * scale, node.Position.y * scale);
+        line(currentPosition.x, currentPosition.y, newPosition.x, newPosition.y);
       }
 
-      currentPosition = node.Position;
+      currentPosition = newPosition;
     }
   }
 }
