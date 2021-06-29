@@ -1,7 +1,7 @@
 
 import processing.svg.*;
 
-FontObject loadedFont;
+SVGFont loadedFont;
 
 void setup()
 {
@@ -23,6 +23,16 @@ void draw()
   loadedFont.Draw("#Hello World#", new PVector(100,100) , 30);
   loadedFont.Draw("Anton Yay", new PVector(150,300) , 10);
 
+  String message = "Long message ..... yow.";
+  float height = 15;
+  PVector size = new PVector(loadedFont.GetWidth(message, height), height);
+  PVector pos = new PVector(width - size.x, 50);
+  loadedFont.Draw(message, pos, height);
+  line(pos.x, pos.y, pos.x + size.x, pos.y);
+  line(pos.x, pos.y + height, pos.x + size.x, pos.y + height);
+  line(pos.x, pos.y, pos.x, pos.y + height);
+  line(pos.x + size.x, pos.y, pos.x + size.x, pos.y + height);
+
   if(isRecording)
   {
     endRecord();
@@ -37,11 +47,14 @@ void keyPressed()
   }
 }
 
-FontObject loadFontXML(String fileName)
+// --------------------------------------------------------------
+// SVG Font
+
+SVGFont loadFontXML(String fileName)
 {
   String acceptedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ?.-#";
   
-  FontObject result = new FontObject();
+  SVGFont result = new SVGFont();
   result.Glyphs = new HashMap<String, Glyph>();
   XML xml = loadXML(fileName);
   XML defs = xml.getChildren("defs")[0];
@@ -95,13 +108,13 @@ FontObject loadFontXML(String fileName)
   return result;
 }
 
-class FontObject
+class SVGFont
 {
   HashMap<String, Glyph> Glyphs;
   
   void Draw(String input, PVector position, float scale)
   {
-    PVector currentPosition = new PVector(position.x, position.y);
+    PVector currentPosition = new PVector(position.x, position.y + scale);
     int len = input.length();
     for(int index = 0; index < len; ++index)
     {
@@ -115,6 +128,25 @@ class FontObject
       glyph.Draw(currentPosition, scale);
       currentPosition.x += scale * glyph.Width;
     }
+  }
+
+  float GetWidth(String input, float scale)
+  {
+    int len = input.length();
+    float w = 0;
+    for(int index = 0; index < len; ++index)
+    {
+      String c = input.substring(index, index + 1);
+      Glyph glyph = this.Glyphs.get("?");
+      if(this.Glyphs.containsKey(c))
+      {
+        glyph = this.Glyphs.get(c);
+      }
+      
+      w += scale * glyph.Width;
+    }
+
+    return w;
   }
 }
 

@@ -9,21 +9,24 @@ int nbBodies = 300;
 final float inkscapeFactor = 3.779528;
 
 final float sceneSize = 792;
-ArrayList<Vec2>[] trajectories;
+ArrayList<PVector>[] trajectories;
 Parameters savedParam, currentParam;
 float drag = 1.;
 float noiseRange = .5;
 float noiseZoom = .15;
-Vec2 baseVelocityRange = new Vec2(1, 30);
+PVector baseVelocityRange = new PVector(1, 30);
 float mainMass = 2000;
 
-Vec2 initialSpread = new Vec2(200, 300);
+PVector initialSpread = new PVector(200, 300);
 
 float sdfPerturbation = .3;
 
 boolean isRecording = false;
 
-Vec2 centerOfMass;
+PVector centerOfMass;
+
+SVGFont font;
+String fontName = "../Font/HersheySans1.svg";
 
 String fieldName = "Circle.jpg";
 float fieldFactor = -40.;
@@ -56,7 +59,7 @@ void spawnBodiesInLine(Parameters param)
     float fndex = (float)index;
     float rv = 1;//random(0,1);
     bodies[index] = new Body(param.StartPos.x + ax * fndex, param.StartPos.y + ay * fndex, dx * rv, dy * rv);
-    trajectories[index] = new ArrayList<Vec2>();
+    trajectories[index] = new ArrayList<PVector>();
   }
 }
 
@@ -85,7 +88,7 @@ void spawnBodiesInCircle(Parameters param)
     float px = cx + ax * radius;
     float py = cy + ay * radius;
     bodies[index] = new Body(px, py, (cx - px) * speedFactor, (cy - py) * speedFactor);
-    trajectories[index] = new ArrayList<Vec2>();
+    trajectories[index] = new ArrayList<PVector>();
   }
 }
 
@@ -104,7 +107,7 @@ void spawnBodiesAcrossScreen(Parameters param)
       float y = j / (float)nbLine * height + hfSize;
       index = j * nbColumn + i;
       bodies[index] = new Body(x, y, 0, 0);
-      trajectories[index] = new ArrayList<Vec2>();
+      trajectories[index] = new ArrayList<PVector>();
     }
   }
 }
@@ -122,18 +125,20 @@ void spawnBodiesInSideLine(Parameters param)
   for(int index = 0; index < loopcount; ++index)
   {
     bodies[index] = new Body(index / (float)loopcount * (float)width * shrnk + halfWidth * (1 - shrnk), 0, 0, param.BaseVelocity.x);
-    trajectories[index] = new ArrayList<Vec2>();
+    trajectories[index] = new ArrayList<PVector>();
 
     if(mirror)
     {
       bodies[index + halfBodies] = new Body(index / (float)loopcount * (float)width * shrnk + halfWidth * (1 - shrnk), height, 0, -param.BaseVelocity.x);
-      trajectories[index + halfBodies] = new ArrayList<Vec2>();
+      trajectories[index + halfBodies] = new ArrayList<PVector>();
     }
   }
 }
 
 void setup() {
   size(548, 377);
+
+  font = loadFontXML(fontName);
 
   sdf = loadImage(fieldName);
   sdf.loadPixels();
@@ -199,7 +204,7 @@ void draw()
       
       body.Update(dt, gravityBodies);
       line(body.px,body.py,body.x,body.y);
-      trajectories[index].add(new Vec2(body.px,body.py));
+      trajectories[index].add(new PVector(body.px,body.py));
     }
     
     stroke(255,0,0);
@@ -221,21 +226,27 @@ void draw()
     
     circleCorner();
     
+    Vec4 screenRect = new Vec4(0, 0, width, height);
+    Vec4 signatureRect = GetSignRect();
+
     for(int index = 0; index < nbBodies;++index)
     {
       int nbPoints = trajectories[index].size();
-      Vec2 p1 = trajectories[index].get(0);
+      PVector p1 = trajectories[index].get(0);
       for(int i = 1; i < nbPoints; ++i)
       {
-        Vec2 p2 = trajectories[index].get(i);
-        if(p1.InsideScreen() && p2.InsideScreen())
+        PVector p2 = trajectories[index].get(i);
+        if(InsideRect(p1, screenRect) && InsideRect(p2, screenRect) && !InsideRect(p1, signatureRect) && ! InsideRect(p2, signatureRect))
         {
           line(p1.x, p1.y, p2.x, p2.y);
         }
+
         p1 = p2;
       }
     }
     
+    Sign();
+
     if(isRecording)
     { 
       endRecord();
@@ -330,11 +341,11 @@ void SimplifyAlignment()
       int nbPoints = trajectories[index].size();
       for(int i = nbPoints - 1; i > 0 ; --i)
       {
-        Vec2 C = trajectories[index].get(i);
-        Vec2 A = trajectories[index].get(i + 1);
-        Vec2 B = trajectories[index].get(i - 1);
-        Vec2 CA = new Vec2(A.x - C.x, A.y - C.y);
-        Vec2 CB = new Vec2(B.x - C.x, B.y - C.y);
+        PVector C = trajectories[index].get(i);
+        PVector A = trajectories[index].get(i + 1);
+        PVector B = trajectories[index].get(i - 1);
+        PVector CA = new PVector(A.x - C.x, A.y - C.y);
+        PVector CB = new PVector(B.x - C.x, B.y - C.y);
         float dot = CA.Dot(CB);
         if(abs(dot < .
         
@@ -393,18 +404,28 @@ int clamp(int x, int low, int high)
   return x;
 }
 
+boolean InsideRect(PVector p, Vec4 rect)
+{
+  return p.x >= rect.x && p. x < rect.x + rect. z && p.y >= rect.y && p.y < rect.y + rect. w;
+}
+
+PVector Clone(PVector o)
+{
+  return new PVector(o.x, o.y);
+}
+
 class Body
 {
   float x,y,px,py;
-  Vec2 speed;
-  Vec2 recordedSpeed;
+  PVector speed;
+  PVector recordedSpeed;
   boolean isInZone;
   boolean dead;
   Body(float x,float y,float dx,float dy)
   {
     this.x = x;
     this.y = y;
-    this.speed = new Vec2(dx, dy);
+    this.speed = new PVector(dx, dy);
     this.px = x;
     this.py = y;
     this.isInZone = false;
@@ -438,7 +459,7 @@ class Body
       }
     }
 
-    this.speed = this.speed.Rotate(n * zoneForce);
+    this.speed = this.speed.rotate(n * zoneForce);
     if(inZone)
     {
     }
@@ -462,39 +483,6 @@ class Body
   }
 }
 
-class Vec2
-{
-  float x,y;
-  Vec2(float x, float y)
-  {
-    this.x = x;
-    this.y = y;
-  }
-  
-  Vec2(Vec2 o)
-  {
-    this.x = o.x;
-    this.y = o.y;
-  }
-  
-  boolean InsideScreen()
-  {
-    return this.x >=0 && this.y >= 0 && this.x <= width && this.y <= height;
-  }
-
-  Vec2 Rotate(float a)
-  {
-    float ca = cos(a);
-    float sa = sin(a);
-    return new Vec2(ca * this.x - sa * this.y, sa * this.x + ca * this.y);
-  }
-  
-  float Dot(Vec2 other)
-  {
-    return this.x * other.x + this.y * other.y;
-  }
-}
-
 class Vec4
 {
   float x,y,z,w;
@@ -509,26 +497,26 @@ class Vec4
 
 class Parameters
 {
-  Vec2 StartPos;
+  PVector StartPos;
   float Angle, Len;
-  Vec2 BaseVelocity;
+  PVector BaseVelocity;
   float[] Velocities;
   
   Parameters()
   {
-    this.StartPos = new Vec2(0, 0);
+    this.StartPos = new PVector(0, 0);
     this.Angle = 0;
     this.Len = 0;
-    this.BaseVelocity = new Vec2(0, 0);
+    this.BaseVelocity = new PVector(0, 0);
     this.Velocities = new float[nbBodies];
   }
   
   Parameters(Parameters other)
   {
-    this.StartPos = new Vec2(other.StartPos);
+    this.StartPos = Clone(other.StartPos);
     this.Angle = other.Angle;
     this.Len = other.Len;
-    this.BaseVelocity = new Vec2(other.BaseVelocity);
+    this.BaseVelocity = Clone(other.BaseVelocity);
     this.Velocities = new float[nbBodies];
     for(int index = 0; index < nbBodies; ++index)
     {
@@ -541,7 +529,7 @@ class Parameters
     float margin = 100;
     float lx = random(margin, sceneSize - margin);
     float ly = random(margin,sceneSize - margin);
-    this.StartPos = new Vec2(lx, ly);
+    this.StartPos = new PVector(lx, ly);
   }
   
   void RandomizeAngle()
@@ -562,7 +550,7 @@ class Parameters
     float randomVelocityLength = random(baseVelocityRange.x, baseVelocityRange.y);
     float dx = cos(randomAngle) * randomVelocityLength;
     float dy = sin(randomAngle) * randomVelocityLength;
-    this.BaseVelocity = new Vec2(dx, dy);
+    this.BaseVelocity = new PVector(dx, dy);
   }
   
   void RandomizeVelocityModifiers()
@@ -583,3 +571,155 @@ class Parameters
     this.RandomizeVelocityModifiers();
   }
 }
+
+void Sign()
+{
+  String signature = "By AntonMakesGames";
+  float scale = 6;
+  PVector size = new PVector(font.GetWidth(signature, scale), scale);
+  PVector pos = new PVector(width - size.x - 10, height - scale * 1.3);
+  font.Draw(signature, pos, scale);
+}
+
+Vec4 GetSignRect()
+{
+  String signature = "By AntonMakesGames";
+  float scale = 6;
+  PVector size = new PVector(font.GetWidth(signature, scale), scale);
+  PVector pos = new PVector(width - size.x - 10, height - scale * 1.3);
+  return new Vec4(pos.x, pos.y, size.x, size.y);
+}
+
+// --------------------------------------------------------------
+// SVG Font
+
+SVGFont loadFontXML(String fileName)
+{
+  String acceptedCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ?.-#";
+  
+  SVGFont result = new SVGFont();
+  result.Glyphs = new HashMap<String, Glyph>();
+  XML xml = loadXML(fileName);
+  XML defs = xml.getChildren("defs")[0];
+  XML font = defs.getChildren("font")[0];
+  XML[] glyphs = font.getChildren("glyph");
+  XML fontFace = font.getChildren("font-face")[0];
+  float scale = fontFace.getFloat("units-per-em");
+  
+  for(int index = 0; index < glyphs.length; ++index)
+  {
+    String unicode = glyphs[index].getString("unicode");
+    if(acceptedCharacters.indexOf(unicode) < 0)
+    {
+      continue;
+    }
+      
+    ArrayList<GlyphNode> parsedNodes = new ArrayList<GlyphNode>();
+    String stringPath = glyphs[index].getString("d");
+    if(stringPath != null)
+    {
+      String[] splitted = split(stringPath, " ");
+      
+      int cursor = 0;
+      while(cursor < splitted.length)
+      {
+        boolean isMove = splitted[cursor].equals("M");
+        cursor++;
+        float x = float(splitted[cursor]);
+        cursor++;
+        float y = float(splitted[cursor]);
+        cursor++;
+        GlyphNode node = new GlyphNode();
+        node.IsMove = isMove;
+        node.Position = new PVector(x/scale, -y/scale);
+        parsedNodes.add(node);
+      }
+    }
+    float w = glyphs[index].getFloat("horiz-adv-x");
+    Glyph glyph = new Glyph();
+    glyph.Unicode = unicode;
+    glyph.Width = w / scale;
+    glyph.Nodes = new GlyphNode[parsedNodes.size()];
+    for(int nodeIndex = 0; nodeIndex < glyph.Nodes.length; ++nodeIndex)
+    {
+      glyph.Nodes[nodeIndex] = parsedNodes.get(nodeIndex);
+    }
+
+    result.Glyphs.put(unicode, glyph);
+  }
+  
+  return result;
+}
+
+class SVGFont
+{
+  HashMap<String, Glyph> Glyphs;
+  
+  void Draw(String input, PVector position, float scale)
+  {
+    PVector currentPosition = new PVector(position.x, position.y + scale);
+    int len = input.length();
+    for(int index = 0; index < len; ++index)
+    {
+      String c = input.substring(index, index + 1);
+      Glyph glyph = this.Glyphs.get("?");
+      if(this.Glyphs.containsKey(c))
+      {
+        glyph = this.Glyphs.get(c);
+      }
+      
+      glyph.Draw(currentPosition, scale);
+      currentPosition.x += scale * glyph.Width;
+    }
+  }
+
+  float GetWidth(String input, float scale)
+  {
+    int len = input.length();
+    float w = 0;
+    for(int index = 0; index < len; ++index)
+    {
+      String c = input.substring(index, index + 1);
+      Glyph glyph = this.Glyphs.get("?");
+      if(this.Glyphs.containsKey(c))
+      {
+        glyph = this.Glyphs.get(c);
+      }
+      
+      w += scale * glyph.Width;
+    }
+
+    return w;
+  }
+}
+
+class Glyph
+{
+  String Unicode;
+  GlyphNode[] Nodes;
+  float Width;
+
+  void Draw(PVector position, float scale)
+  {
+    PVector currentPosition = new PVector(position.x, position.y);
+    for(int index = 0; index < this.Nodes.length; ++index)
+    {
+      GlyphNode node = this.Nodes[index];
+      PVector newPosition = new PVector(position.x + node.Position.x * scale, position.y + node.Position.y * scale);
+      if(!node.IsMove)
+      {
+        line(currentPosition.x, currentPosition.y, newPosition.x, newPosition.y);
+      }
+
+      currentPosition = newPosition;
+    }
+  }
+}
+
+class GlyphNode
+{
+  boolean IsMove = false;
+  PVector Position;
+}
+
+// ----------------------------------------------------------------------
