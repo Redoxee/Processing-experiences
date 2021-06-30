@@ -8,6 +8,9 @@ void setup()
     exit();
 }
 
+// ------------------------------------------------------------------------------------
+// CounterSave
+
 int GetCount(String fileName)
 {
     String[] strings = loadStrings(fileName);
@@ -36,3 +39,4 @@ String ToHex(int input)
 
     return result;
 }
+// ------------------------------------------------------------------------------------

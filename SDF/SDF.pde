@@ -28,6 +28,8 @@ PVector centerOfMass;
 SVGFont font;
 String fontName = "../Font/HersheySans1.svg";
 
+String counterSaveFileName = "../Counter/CounterSave";
+
 String fieldName = "Circle.jpg";
 float fieldFactor = -40.;
 PImage sdf;
@@ -219,7 +221,8 @@ void draw()
     
     if(isRecording)
     {
-      String fileName = GetAvailableFileName(exportFileName, "svg");
+      String counter = ToHex(GetCount(counterSaveFileName));
+      String fileName = GetAvailableFileName(exportFileName + counter, "svg");
       println("Start recording " + fileName);
       beginRecord(SVG, fileName);
     }
@@ -243,6 +246,11 @@ void draw()
 
         p1 = p2;
       }
+
+      if(isRecording && index % 10 == 0)
+      {
+        println((float)index / (float)nbBodies * 100f);
+      }
     }
     
     Sign();
@@ -251,6 +259,7 @@ void draw()
     { 
       endRecord();
       println("Stop recording");
+      IncrementSavedCounter(counterSaveFileName);
       isRecording = false;
     }
   }
@@ -313,7 +322,7 @@ void keyPressed()
     
     if(key == 'j')
     {
-      this.SimplifyLines();
+      this.SimplifyAlignment();
     }
   }
 }
@@ -333,27 +342,28 @@ void SimplifyLines()
     }
 }
 
-/*
 void SimplifyAlignment()
 {
-  for(int index = 0; index < nbBodies;++index)
+  for(int pIndex = 0; pIndex < nbBodies; ++pIndex)
+  {
+    ArrayList<PVector> trajectory = trajectories[pIndex];
+    int nbPoints = trajectory.size();
+    for(int index = nbPoints - 2; index > 1; --index)
     {
-      int nbPoints = trajectories[index].size();
-      for(int i = nbPoints - 1; i > 0 ; --i)
+      PVector p0 = trajectory.get(index);
+      PVector p1 = trajectory.get(index + 1);
+      PVector p2 = trajectory.get(index - 1);
+      PVector a = PVector.sub(p1, p0).normalize();
+      PVector b = PVector.sub(p2, p0).normalize();
+      float dot = a.dot(b);
+      if(abs(dot) == 1)
       {
-        PVector C = trajectories[index].get(i);
-        PVector A = trajectories[index].get(i + 1);
-        PVector B = trajectories[index].get(i - 1);
-        PVector CA = new PVector(A.x - C.x, A.y - C.y);
-        PVector CB = new PVector(B.x - C.x, B.y - C.y);
-        float dot = CA.Dot(CB);
-        if(abs(dot < .
-        
-        trajectories[index].remove(nbPoints - 1 - i * 2);
+        trajectory.remove(index);
       }
     }
+  }
 }
-*/
+
 String GetAvailableFileName(String desiredFileName, String extension)
 {
   String ext = "." + extension;
@@ -574,7 +584,8 @@ class Parameters
 
 void Sign()
 {
-  String signature = "By AntonMakesGames";
+  String counter = ToHex(GetCount(counterSaveFileName));
+  String signature = counter + " - By AntonMakesGames";
   float scale = 6;
   PVector size = new PVector(font.GetWidth(signature, scale), scale);
   PVector pos = new PVector(width - size.x - 10, height - scale * 1.3);
@@ -583,7 +594,8 @@ void Sign()
 
 Vec4 GetSignRect()
 {
-  String signature = "By AntonMakesGames";
+  String counter = ToHex(GetCount(counterSaveFileName));
+  String signature = counter + " - By AntonMakesGames";
   float scale = 6;
   PVector size = new PVector(font.GetWidth(signature, scale), scale);
   PVector pos = new PVector(width - size.x - 10, height - scale * 1.3);
@@ -723,3 +735,37 @@ class GlyphNode
 }
 
 // ----------------------------------------------------------------------
+
+
+// ------------------------------------------------------------------------------------
+// CounterSave
+
+int GetCount(String fileName)
+{
+    String[] strings = loadStrings(fileName);
+    return int(strings[0]);
+}
+
+int IncrementSavedCounter(String fileName)
+{
+    int count = GetCount(fileName);
+    PrintWriter output = createWriter(fileName);
+    output.print(count + 1);
+    output.close();
+    return count;
+}
+
+String ToHex(int input)
+{
+    String charTable = "0123456789ABCDEF";
+    String result = "";
+    do
+    {
+        int rest = input % 16;
+        result = charTable.charAt(rest) + result;
+        input /= 16;
+    }while(input > 0);
+
+    return result;
+}
+// ------------------------------------------------------------------------------------
