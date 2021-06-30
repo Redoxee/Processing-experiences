@@ -5,7 +5,7 @@ String exportFileName = "Exports/sdfRecording";
 
 GravityBody[] gravityBodies;
 Body[] bodies;
-int nbBodies = 150;
+int nbBodies = 600;
 final float inkscapeFactor = 3.779528;
 
 final float sceneSize = 792;
@@ -239,7 +239,7 @@ void draw()
       for(int i = 1; i < nbPoints; ++i)
       {
         PVector p2 = trajectories[index].get(i);
-        if(InsideRect(p1, screenRect) && InsideRect(p2, screenRect) && !InsideRect(p1, signatureRect) && ! InsideRect(p2, signatureRect))
+        if(InsideRect(p1, screenRect) && InsideRect(p2, screenRect) && !InsideRect(p1, signatureRect) && ! InsideRect(p2, signatureRect) && ! Occluded(p1, p2))
         {
           line(p1.x, p1.y, p2.x, p2.y);
         }
@@ -362,6 +362,17 @@ void SimplifyAlignment()
       }
     }
   }
+}
+
+boolean Occluded(PVector p1, PVector p2)
+{
+  PVector center = new PVector(width / 2, height / 2);
+  if(PVector.dist(center, p1) < 10 || PVector.dist(center, p2) < 10)
+  {
+    return true;
+  }
+
+  return false;
 }
 
 String GetAvailableFileName(String desiredFileName, String extension)
