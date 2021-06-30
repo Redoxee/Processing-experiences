@@ -5,19 +5,19 @@ String exportFileName = "Exports/sdfRecording";
 
 GravityBody[] gravityBodies;
 Body[] bodies;
-int nbBodies = 300;
+int nbBodies = 150;
 final float inkscapeFactor = 3.779528;
 
 final float sceneSize = 792;
 ArrayList<PVector>[] trajectories;
 Parameters savedParam, currentParam;
 float drag = 1.;
-float noiseRange = .5;
+float noiseRange = .15;
 float noiseZoom = .15;
-PVector baseVelocityRange = new PVector(1, 30);
+PVector baseVelocityRange = new PVector(10, 50);
 float mainMass = 2000;
 
-PVector initialSpread = new PVector(200, 300);
+PVector initialSpread = new PVector(1, 20);
 
 float sdfPerturbation = .3;
 
@@ -30,7 +30,7 @@ String fontName = "../Font/HersheySans1.svg";
 
 String counterSaveFileName = "../Counter/CounterSave";
 
-String fieldName = "Circle.jpg";
+String fieldName = "Gradient.jpg";
 float fieldFactor = -40.;
 PImage sdf;
 Vec4[] vecSdf;
@@ -38,6 +38,26 @@ Vec4[] vecSdf;
 enum States
 {UpdatingBodies, PreparingPainting}
 States state;
+
+void setup() {
+  size(548, 377);
+
+  font = loadFontXML(fontName);
+
+  sdf = loadImage(fieldName);
+  sdf.loadPixels();
+
+  gravityBodies = new GravityBody[1];
+  gravityBodies[0] = new GravityBody(width/2f, height/2f, mainMass);
+  bodies = new Body[nbBodies];
+  trajectories = new ArrayList[nbBodies];
+  Parameters param = new Parameters();
+  param.Randomize();
+  savedParam = param;
+  currentParam = param;
+  buildVecSdf();
+  ApplyParam(param);
+}
 
 void ApplyParam(Parameters param)
 {
@@ -89,7 +109,7 @@ void spawnBodiesInCircle(Parameters param)
     float ay = sin(f);
     float px = cx + ax * radius;
     float py = cy + ay * radius;
-    bodies[index] = new Body(px, py, (cx - px) * speedFactor, (cy - py) * speedFactor);
+    bodies[index] = new Body(px, py, ax * speedFactor, ay * speedFactor);
     trajectories[index] = new ArrayList<PVector>();
   }
 }
@@ -135,26 +155,6 @@ void spawnBodiesInSideLine(Parameters param)
       trajectories[index + halfBodies] = new ArrayList<PVector>();
     }
   }
-}
-
-void setup() {
-  size(548, 377);
-
-  font = loadFontXML(fontName);
-
-  sdf = loadImage(fieldName);
-  sdf.loadPixels();
-
-  gravityBodies = new GravityBody[1];
-  gravityBodies[0] = new GravityBody(width/2f, height/2f, mainMass);
-  bodies = new Body[nbBodies];
-  trajectories = new ArrayList[nbBodies];
-  Parameters param = new Parameters();
-  param.Randomize();
-  savedParam = param;
-  currentParam = param;
-  buildVecSdf();
-  ApplyParam(param);
 }
 
 float time = 0;
@@ -586,7 +586,7 @@ void Sign()
 {
   String counter = ToHex(GetCount(counterSaveFileName));
   String signature = counter + " - By AntonMakesGames";
-  float scale = 6;
+  float scale = 4;
   PVector size = new PVector(font.GetWidth(signature, scale), scale);
   PVector pos = new PVector(width - size.x - 10, height - scale * 1.3);
   font.Draw(signature, pos, scale);
@@ -596,7 +596,7 @@ Vec4 GetSignRect()
 {
   String counter = ToHex(GetCount(counterSaveFileName));
   String signature = counter + " - By AntonMakesGames";
-  float scale = 6;
+  float scale = 4;
   PVector size = new PVector(font.GetWidth(signature, scale), scale);
   PVector pos = new PVector(width - size.x - 10, height - scale * 1.3);
   return new Vec4(pos.x, pos.y, size.x, size.y);
