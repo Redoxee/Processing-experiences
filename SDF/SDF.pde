@@ -5,19 +5,19 @@ String exportFileName = "Exports/sdfRecording";
 
 GravityBody[] gravityBodies;
 Body[] bodies;
-int nbBodies = 600;
+int nbBodies = 300;
 final float inkscapeFactor = 3.779528;
 
 final float sceneSize = 792;
 ArrayList<PVector>[] trajectories;
 Parameters savedParam, currentParam;
 float drag = 1.;
-float noiseRange = .15;
-float noiseZoom = .15;
-PVector baseVelocityRange = new PVector(10, 50);
+float noiseRange = 1.5;
+float noiseZoom = 1.;
+PVector baseVelocityRange = new PVector(1, 20);
 float mainMass = 2000;
 
-PVector initialSpread = new PVector(1, 20);
+PVector initialSpread = new PVector(150, 250);
 
 float sdfPerturbation = .3;
 
@@ -25,13 +25,9 @@ boolean isRecording = false;
 
 PVector centerOfMass;
 
-SVGFont font;
-String fontName = "../Font/HersheySans1.svg";
 
-String counterSaveFileName = "../Counter/CounterSave";
-
-String fieldName = "Gradient.jpg";
-float fieldFactor = -40.;
+String fieldName = "Target.jpg";
+float fieldFactor = .4;
 PImage sdf;
 Vec4[] vecSdf;
 
@@ -91,16 +87,15 @@ void spawnBodiesInCircle(Parameters param)
   float cy = height / 2;
   float radius = param.Len;
   
-  float len2 = param.BaseVelocity.x * param.BaseVelocity.x + param.BaseVelocity.y * param.BaseVelocity.y;
-  float len = sqrt(len2);
+  float velocity = param.BaseVelocity.mag();
   boolean outward = false;
   float speedFactor = 1;
-  if(outward)
+  if(!outward)
   {
     speedFactor = -1;
   }
 
-  speedFactor *= len / radius;
+  speedFactor *= velocity;
 
   for(int index = 0; index < nbBodies; ++index)
   {
@@ -344,24 +339,36 @@ void SimplifyLines()
 
 void SimplifyAlignment()
 {
+  Vec4 screenRect = new Vec4(0, 0, width, height);
+  int nbRemove =0;
   for(int pIndex = 0; pIndex < nbBodies; ++pIndex)
   {
     ArrayList<PVector> trajectory = trajectories[pIndex];
     int nbPoints = trajectory.size();
-    for(int index = nbPoints - 2; index > 1; --index)
+    println(nbPoints);
+    for(int index = nbPoints - 2; index > 2; --index)
     {
       PVector p0 = trajectory.get(index);
       PVector p1 = trajectory.get(index + 1);
       PVector p2 = trajectory.get(index - 1);
+      
+      if(!InsideRect(p0, screenRect) || !InsideRect(p1, screenRect) || !InsideRect(p2, screenRect))
+      {
+        continue;
+      }
+      
       PVector a = PVector.sub(p1, p0).normalize();
       PVector b = PVector.sub(p2, p0).normalize();
       float dot = a.dot(b);
-      if(abs(dot) == 1)
+      if(abs(dot) > .999)
       {
         trajectory.remove(index);
+        nbRemove++;
       }
     }
+    
   }
+  println("removed " + nbRemove);
 }
 
 boolean Occluded(PVector p1, PVector p2)
@@ -472,17 +479,13 @@ class Body
     {
       if(inZone)
       {
-        this.recordedSpeed = this.speed;
+        this.recordedSpeed = Clone(this.speed);
+        this.speed.rotate(fieldFactor);
       }
       else
       {
         this.speed = this.recordedSpeed;
       }
-    }
-
-    this.speed = this.speed.rotate(n * zoneForce);
-    if(inZone)
-    {
     }
 
     this.x += this.speed.x * dt;
@@ -493,7 +496,7 @@ class Body
     if(noiseRange != 0)
     {
 //      this.speed.x += (noise(this.x * noiseZoom, this.y * noiseZoom, 0) * noiseRange * 2) - noiseRange;
- //     this.speed.y += (noise(this.x * noiseZoom, this.y * noiseZoom, 1) * noiseRange * 2) - noiseRange;
+//      this.speed.y += (noise(this.x * noiseZoom, this.y * noiseZoom, 1) * noiseRange * 2) - noiseRange;
     }
 
     if(drag != 1)
@@ -593,11 +596,16 @@ class Parameters
   }
 }
 
+// ------------------------------------------------------------------------
+SVGFont font;
+String fontName = "../Font/HersheySans1.svg";
+String counterSaveFileName = "../Counter/CounterSave";
+
 void Sign()
 {
   String counter = ToHex(GetCount(counterSaveFileName));
   String signature = counter + " - By AntonMakesGames";
-  float scale = 4;
+  float scale = 7;
   PVector size = new PVector(font.GetWidth(signature, scale), scale);
   PVector pos = new PVector(width - size.x - 10, height - scale * 1.3);
   font.Draw(signature, pos, scale);
@@ -607,7 +615,7 @@ Vec4 GetSignRect()
 {
   String counter = ToHex(GetCount(counterSaveFileName));
   String signature = counter + " - By AntonMakesGames";
-  float scale = 4;
+  float scale = 7;
   PVector size = new PVector(font.GetWidth(signature, scale), scale);
   PVector pos = new PVector(width - size.x - 10, height - scale * 1.3);
   return new Vec4(pos.x, pos.y, size.x, size.y);
