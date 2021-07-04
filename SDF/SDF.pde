@@ -5,24 +5,27 @@ String exportFileName = "Exports/sdfRecording";
 
 GravityBody[] gravityBodies;
 Body[] bodies;
-int nbBodies = 300;
+int nbBodies = 200;
 final float inkscapeFactor = 3.779528;
 
 final float sceneSize = 792;
 ArrayList<PVector>[] trajectories;
 Parameters savedParam, currentParam;
 float drag = 1.;
-float noiseRange = 1.5;
+float noiseRange = .9;
 float noiseZoom = 1.;
-PVector baseVelocityRange = new PVector(1, 20);
+PVector baseVelocityRange = new PVector(10, 25);
+boolean velDirectionOutward = false;
 float mainMass = 2000;
 
-PVector initialSpread = new PVector(150, 250);
+PVector initialSpread = new PVector(220, 270);
 
 float sdfPerturbation = .3;
 
-boolean isRecording = false;
+boolean DisableOcclusion = true;
+boolean RandomizeLines = true;
 
+boolean isRecording = false;
 PVector centerOfMass;
 
 
@@ -30,6 +33,8 @@ String fieldName = "Target.jpg";
 float fieldFactor = .4;
 PImage sdf;
 Vec4[] vecSdf;
+
+int[] randomizedIndexes = null;
 
 enum States
 {UpdatingBodies, PreparingPainting}
@@ -88,9 +93,8 @@ void spawnBodiesInCircle(Parameters param)
   float radius = param.Len;
   
   float velocity = param.BaseVelocity.mag();
-  boolean outward = false;
   float speedFactor = 1;
-  if(!outward)
+  if(!velDirectionOutward)
   {
     speedFactor = -1;
   }
@@ -214,10 +218,11 @@ void draw()
   {
     background(225);
     
+    String fileName = "";
     if(isRecording)
     {
-      String counter = ToHex(GetCount(counterSaveFileName));
-      String fileName = GetAvailableFileName(exportFileName + counter, "svg");
+      String counter = FormatCount(GetCount(counterSaveFileName));
+      fileName = GetAvailableFileName(exportFileName + counter, "svg");
       println("Start recording " + fileName);
       beginRecord(SVG, fileName);
     }
@@ -227,14 +232,21 @@ void draw()
     Vec4 screenRect = new Vec4(0, 0, width, height);
     Vec4 signatureRect = GetSignRect();
 
+    if(randomizedIndexes == null || randomizedIndexes.length != nbBodies)
+    {
+      randomizedIndexes = GetRandomArrayIndexes(nbBodies);
+    }
+
     for(int index = 0; index < nbBodies;++index)
     {
-      int nbPoints = trajectories[index].size();
-      PVector p1 = trajectories[index].get(0);
+      int rIndex = randomizedIndexes[index];
+      ArrayList<PVector> trajectory = trajectories[rIndex];
+      int nbPoints = trajectory.size();
+      PVector p1 = trajectory.get(0);
       for(int i = 1; i < nbPoints; ++i)
       {
-        PVector p2 = trajectories[index].get(i);
-        if(InsideRect(p1, screenRect) && InsideRect(p2, screenRect) && !InsideRect(p1, signatureRect) && ! InsideRect(p2, signatureRect) && ! Occluded(p1, p2))
+        PVector p2 = trajectory.get(i);
+        if(InsideRect(p1, screenRect) && InsideRect(p2, screenRect) && !InsideRect(p1, signatureRect) && !InsideRect(p2, signatureRect) && !Occluded(p1, p2))
         {
           line(p1.x, p1.y, p2.x, p2.y);
         }
@@ -253,7 +265,7 @@ void draw()
     if(isRecording)
     { 
       endRecord();
-      println("Stop recording");
+      println("Stop recording " + fileName);
       IncrementSavedCounter(counterSaveFileName);
       isRecording = false;
     }
@@ -340,6 +352,7 @@ void SimplifyLines()
 void SimplifyAlignment()
 {
   Vec4 screenRect = new Vec4(0, 0, width, height);
+  Vec4 signatureRect = GetSignRect();
   int nbRemove =0;
   for(int pIndex = 0; pIndex < nbBodies; ++pIndex)
   {
@@ -351,8 +364,8 @@ void SimplifyAlignment()
       PVector p0 = trajectory.get(index);
       PVector p1 = trajectory.get(index + 1);
       PVector p2 = trajectory.get(index - 1);
-      
-      if(!InsideRect(p0, screenRect) || !InsideRect(p1, screenRect) || !InsideRect(p2, screenRect))
+
+      if(!InsideRect(p0, screenRect) || !InsideRect(p1, screenRect) || !InsideRect(p2, screenRect) || InsideRect(p0, signatureRect) || InsideRect(p1, signatureRect) || Occluded(p0, p1) || Occluded (p0, p2))
       {
         continue;
       }
@@ -373,6 +386,11 @@ void SimplifyAlignment()
 
 boolean Occluded(PVector p1, PVector p2)
 {
+  if(DisableOcclusion)
+  {
+    return false;
+  }
+
   PVector center = new PVector(width / 2, height / 2);
   if(PVector.dist(center, p1) < 10 || PVector.dist(center, p2) < 10)
   {
@@ -480,12 +498,17 @@ class Body
       if(inZone)
       {
         this.recordedSpeed = Clone(this.speed);
-        this.speed.rotate(fieldFactor);
+        //this.speed.rotate(fieldFactor);
       }
       else
       {
         this.speed = this.recordedSpeed;
       }
+    }
+
+    if(inZone)
+    {
+      this.speed = this.speed.rotate(n * 3.14269);
     }
 
     this.x += this.speed.x * dt;
@@ -774,6 +797,19 @@ int IncrementSavedCounter(String fileName)
     return count;
 }
 
+String FormatCount(int input)
+{
+  int acc = 1000;
+  String result = "";
+  while(acc > input)
+  {
+    result += "0";
+    acc /= 10;
+  }
+  result += str(input);
+  return result;
+}
+
 String ToHex(int input)
 {
     String charTable = "0123456789ABCDEF";
@@ -787,4 +823,32 @@ String ToHex(int input)
 
     return result;
 }
+
 // ------------------------------------------------------------------------------------
+
+int[] GetRandomArrayIndexes(int size)
+{
+  int[] arrayIndexes = new int[size];
+  for(int index  = 0; index < size; ++index)
+  {
+    arrayIndexes[index] = index;
+  }
+
+  if(!RandomizeLines)
+  {
+    return arrayIndexes;
+  }
+
+  for(int index = 0; index < size - 1; ++index)
+  {
+    int swapIndex = int(random(size - 1 - index) + index);
+    if(swapIndex != index)
+    {
+      int t = arrayIndexes[swapIndex];
+      arrayIndexes[swapIndex] = arrayIndexes[index];
+      arrayIndexes[index] = t;
+    }
+  }
+
+  return arrayIndexes;
+}
