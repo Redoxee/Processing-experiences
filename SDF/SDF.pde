@@ -12,25 +12,25 @@ final float sceneSize = 792;
 ArrayList<PVector>[] trajectories;
 Parameters savedParam, currentParam;
 float drag = 1.;
-float noiseRange = .9;
-float noiseZoom = 1.;
-PVector baseVelocityRange = new PVector(10, 25);
+float noiseRange = .3;
+float noiseZoom = .3;
+PVector baseVelocityRange = new PVector(4, 15);
 boolean velDirectionOutward = false;
 float mainMass = 2000;
 
-PVector initialSpread = new PVector(220, 270);
+PVector initialSpread = new PVector(0, 0);
 
 float sdfPerturbation = .3;
 
 boolean DisableOcclusion = true;
-boolean RandomizeLines = true;
+boolean RandomizeLines = false;
 
 boolean isRecording = false;
 PVector centerOfMass;
 
-
-String fieldName = "Target.jpg";
+String fieldName = "Arrow.jpg";
 float fieldFactor = .4;
+boolean invertZone = false;
 PImage sdf;
 Vec4[] vecSdf;
 
@@ -375,7 +375,7 @@ void SimplifyAlignment()
       float dot = a.dot(b);
       if(abs(dot) > .999)
       {
-        trajectory.remove(index);
+        trajectory.remove(index + 1);
         nbRemove++;
       }
     }
@@ -489,6 +489,10 @@ class Body
     Vec4 sdf = vecSdf[sdfIndex];
     boolean inZone = sdf.y > 0;
     float zoneForce = sdf.y;
+    if(invertZone)
+    {
+      inZone = !inZone;
+    }
     //this.dx = sdf.z * fieldFactor;
     //this.dy = sdf.w * fieldFactor;
     
